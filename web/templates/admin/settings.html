@@ -1,0 +1,240 @@
+{{template "admin" .}}
+
+{{define "content"}}
+<!-- Application Settings -->
+<div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+    <h3 class="text-lg font-bold mb-4">Application Settings</h3>
+    <p class="text-gray-600 text-sm mb-4">Configure general application settings.</p>
+    <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Base URL</label>
+        <input type="text" id="base-url"
+               class="w-full border border-gray-300 rounded-lg px-4 py-2">
+        <p class="text-xs text-gray-500 mt-1">The base URL used for generating QR codes. Changes take effect immediately on all newly generated QR codes.</p>
+    </div>
+    <button id="save-base-url" class="w-full bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700">
+        Save Base URL
+    </button>
+    <p id="base-url-message" class="mt-2 text-sm"></p>
+</div>
+
+<!-- Voting Security -->
+<div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+    <h3 class="text-lg font-bold mb-4">Voting Security</h3>
+    <p class="text-gray-600 text-sm mb-4">Configure security settings for voting.</p>
+    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+        <div>
+            <label class="font-medium text-gray-700">Require Registered QR Codes</label>
+            <p class="text-xs text-gray-500 mt-1">When enabled, only pre-generated QR codes can be used to vote. Unrecognized QR codes will be rejected.</p>
+        </div>
+        <label class="inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="require-registered-qr" class="sr-only peer">
+            <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+        </label>
+    </div>
+    <p id="require-qr-message" class="mt-2 text-sm"></p>
+
+    <!-- Dynamic QR Code for open voting -->
+    <div id="dynamic-qr-section" class="hidden mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <div class="flex items-start gap-4">
+            <div class="flex-1">
+                <h4 class="font-semibold text-blue-900 mb-2">Universal Voting QR Code</h4>
+                <p class="text-sm text-blue-800 mb-3">
+                    When "Require Registered QR Codes" is disabled, anyone can scan this QR code to vote.
+                    Each scan generates a unique code automatically - no need to pre-register voters!
+                </p>
+                <p class="text-xs text-blue-700 mb-3">
+                    <strong>How it works:</strong> Each person scans the same QR code, but they each get their own unique voting session.
+                    Perfect for events where you don't know how many people will vote.
+                </p>
+                <div class="flex gap-2">
+                    <button id="download-dynamic-qr" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700">
+                        Download QR Code
+                    </button>
+                    <button id="print-dynamic-qr" class="bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-700">
+                        Print QR Code
+                    </button>
+                </div>
+            </div>
+            <div class="flex-shrink-0">
+                <div id="dynamic-qr-display" class="bg-white p-3 rounded-lg border-2 border-blue-300 shadow-md">
+                    <div class="text-center text-gray-400 text-sm">Loading QR code...</div>
+                </div>
+                <p class="text-xs text-center text-blue-700 mt-2 font-medium">Scan to vote</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Voting Instructions -->
+<div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+    <h3 class="text-lg font-bold mb-4">Voting Instructions</h3>
+    <p class="text-gray-600 text-sm mb-4">Customize the instructions shown to voters on the voting page.</p>
+    <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Instructions Text</label>
+        <textarea id="voting-instructions"
+                  class="w-full border border-gray-300 rounded-lg px-4 py-2 font-mono text-sm"
+                  rows="6"
+                  placeholder="Enter custom instructions for voters..."></textarea>
+        <p class="text-xs text-gray-500 mt-1">Leave empty to use default instructions. You can use line breaks for multiple paragraphs.</p>
+    </div>
+    <button id="save-instructions" class="w-full bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700">
+        Save Instructions
+    </button>
+    <p id="instructions-message" class="mt-2 text-sm"></p>
+</div>
+
+<!-- Voter Types -->
+<div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+    <h3 class="text-lg font-bold mb-4">Voter Types</h3>
+    <p class="text-gray-600 text-sm mb-4">Manage the voter types available in your event. "general" and "racer" are required and cannot be removed.</p>
+
+    <div id="voter-types-list" class="space-y-2 mb-4">
+        <!-- Voter types will be populated here -->
+    </div>
+
+    <div class="flex gap-2 mb-4">
+        <input type="text" id="new-voter-type"
+               class="flex-1 border border-gray-300 rounded-lg px-4 py-2"
+               placeholder="Enter new voter type (e.g., 'Leader', 'Parent')">
+        <button id="add-voter-type" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700">
+            Add Type
+        </button>
+    </div>
+
+    <button id="save-voter-types" class="w-full bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700">
+        Save Voter Types
+    </button>
+    <p id="voter-types-message" class="mt-2 text-sm"></p>
+</div>
+
+<!-- Sync from DerbyNet -->
+<div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+    <h3 class="text-lg font-bold mb-4">Sync from DerbyNet</h3>
+    <p class="text-gray-600 text-sm mb-4">Import car and racer information from your DerbyNet installation.</p>
+    <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-2">DerbyNet URL</label>
+        <input type="text" id="derbynet-url"
+               class="w-full border border-gray-300 rounded-lg px-4 py-2"
+               placeholder="http://localhost/derbynet">
+        <p class="text-xs text-gray-500 mt-1">Example: http://localhost/derbynet or https://hosting.derbynet.org/playground/huge-sidewalk</p>
+    </div>
+
+    <!-- DerbyNet Authentication (optional) -->
+    <div class="border-t border-gray-200 pt-4 mt-4">
+        <h4 class="text-sm font-semibold text-gray-700 mb-2">Authentication (optional)</h4>
+        <p class="text-xs text-gray-500 mb-3">Required for creating awards in DerbyNet. Leave empty if only pulling data.</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Role</label>
+                <select id="derbynet-role" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+                    <option value="">-- No authentication --</option>
+                    <option value="RaceCoordinator">Race Coordinator</option>
+                    <option value="RaceCrew">Race Crew</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                <input type="password" id="derbynet-password"
+                       class="w-full border border-gray-300 rounded-lg px-4 py-2"
+                       placeholder="DerbyNet password">
+            </div>
+        </div>
+    </div>
+
+    <button id="save-derbynet" class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 mb-2">
+        Save DerbyNet Settings
+    </button>
+    <p id="derbynet-message" class="text-sm"></p>
+
+    <button id="test-derbynet" class="w-full bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 mt-4">
+        Test Connection
+    </button>
+    <p id="test-message" class="mt-2 text-sm"></p>
+</div>
+
+<!-- Seed Mock Data -->
+<div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+    <h3 class="text-lg font-bold mb-4">Seed Mock Data</h3>
+    <p class="text-gray-600 text-sm mb-4">Add sample data for testing. This will not delete existing data.</p>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="border border-gray-200 rounded-lg p-4">
+            <h4 class="font-semibold mb-2">Seed Categories</h4>
+            <p class="text-sm text-gray-600 mb-3">Adds default award categories if they don't already exist.</p>
+            <button id="seed-categories" class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700">
+                Seed Categories
+            </button>
+            <p id="seed-categories-message" class="mt-2 text-sm"></p>
+        </div>
+
+        <div class="border border-gray-200 rounded-lg p-4">
+            <h4 class="font-semibold mb-2">Seed Cars</h4>
+            <p class="text-sm text-gray-600 mb-3">Adds 20 sample cars with placeholder images.</p>
+            <button id="seed-cars" class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700">
+                Seed Cars
+            </button>
+            <p id="seed-cars-message" class="mt-2 text-sm"></p>
+        </div>
+    </div>
+</div>
+
+<!-- Danger Zone -->
+<div class="bg-white rounded-lg shadow-lg p-6 border-2 border-red-200">
+    <h3 class="text-lg font-bold mb-4 text-red-600">Danger Zone</h3>
+    <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+        <h4 class="font-semibold text-red-800 mb-3">Reset Database</h4>
+        <p class="text-sm text-red-700 mb-4">Select what data to reset. This action CANNOT be undone!</p>
+
+        <div class="space-y-3 mb-4">
+            <label class="flex items-start cursor-pointer">
+                <input type="checkbox" id="reset-votes" name="reset-item" value="votes" class="mt-1 mr-3">
+                <div class="flex-1">
+                    <div class="font-semibold text-red-800">Votes</div>
+                    <div class="text-sm text-red-600">Clears all votes</div>
+                    <div id="votes-auto-note" class="text-xs text-orange-600 mt-1 hidden">
+                        Auto-selected because you're clearing cars/voters/categories
+                    </div>
+                </div>
+            </label>
+
+            <label class="flex items-start cursor-pointer">
+                <input type="checkbox" id="reset-voters" name="reset-item" value="voters" class="mt-1 mr-3">
+                <div class="flex-1">
+                    <div class="font-semibold text-red-800">Voters</div>
+                    <div class="text-sm text-red-600">Clears all voters (will also clear votes)</div>
+                </div>
+            </label>
+
+            <label class="flex items-start cursor-pointer">
+                <input type="checkbox" id="reset-cars" name="reset-item" value="cars" class="mt-1 mr-3">
+                <div class="flex-1">
+                    <div class="font-semibold text-red-800">Cars</div>
+                    <div class="text-sm text-red-600">Clears all cars (will also clear votes)</div>
+                </div>
+            </label>
+
+            <label class="flex items-start cursor-pointer">
+                <input type="checkbox" id="reset-categories" name="reset-item" value="categories" class="mt-1 mr-3">
+                <div class="flex-1">
+                    <div class="font-semibold text-red-800">Categories</div>
+                    <div class="text-sm text-red-600">Clears all categories (will also clear votes)</div>
+                </div>
+            </label>
+        </div>
+
+        <div class="flex gap-3">
+            <button id="reset-db" class="flex-1 bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700">
+                Reset Selected
+            </button>
+            <button id="reset-all" class="flex-1 bg-red-800 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-900">
+                Reset ALL Data
+            </button>
+        </div>
+        <p id="reset-message" class="mt-2 text-sm"></p>
+    </div>
+</div>
+{{end}}
+
+{{define "scripts"}}
+<script src="/static/js/settings.js"></script>
+{{end}}

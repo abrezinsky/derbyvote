@@ -1,0 +1,76 @@
+/* Admin custom styles */
+
+/* These extend Tailwind - add any custom styles here */
+
+/* Modal animations */
+.modal-enter {
+    opacity: 0;
+    transform: scale(0.95);
+}
+
+.modal-enter-active {
+    opacity: 1;
+    transform: scale(1);
+    transition: opacity 150ms ease-out, transform 150ms ease-out;
+}
+
+/* Status indicators */
+.status-open {
+    color: #16a34a; /* green-600 */
+}
+
+.status-closed {
+    color: #dc2626; /* red-600 */
+}
+
+/* Countdown colors */
+.countdown-normal {
+    color: #2563eb; /* blue-600 */
+}
+
+.countdown-warning {
+    color: #ea580c; /* orange-600 */
+}
+
+.countdown-urgent {
+    color: #dc2626; /* red-600 */
+}
+
+/* Loading states */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* Toast notifications */
+.toast {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    padding: 1rem 1.5rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    z-index: 100;
+    animation: slideIn 0.3s ease-out;
+}
+
+.toast-success {
+    background-color: #16a34a;
+    color: white;
+}
+
+.toast-error {
+    background-color: #dc2626;
+    color: white;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}

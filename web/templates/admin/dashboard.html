@@ -1,0 +1,73 @@
+{{template "admin" .}}
+
+{{define "content"}}
+<!-- Voting Control -->
+<div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+    <h2 class="text-xl font-bold mb-4">Voting Control</h2>
+    <div class="mb-6">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <p class="text-gray-600">Voting is currently:</p>
+                <p id="voting-status" class="text-2xl font-bold status-open">Open</p>
+                <div id="countdown-display" class="mt-2 hidden">
+                    <p class="countdown-normal font-bold text-lg">Time remaining: <span id="countdown-time">5:00</span></p>
+                </div>
+            </div>
+            <button id="toggle-voting" class="bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700">
+                Close Voting
+            </button>
+        </div>
+    </div>
+
+    <!-- Timer Control -->
+    <div class="border-t pt-4">
+        <h3 class="font-semibold mb-3">Set Countdown Timer</h3>
+        <div class="flex items-center gap-4">
+            <div class="flex-1">
+                <label class="block text-sm text-gray-600 mb-2">Close voting in:</label>
+                <div class="flex gap-2">
+                    <button data-timer="1" class="flex-1 bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg font-semibold">1 min</button>
+                    <button data-timer="5" class="flex-1 bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg font-semibold">5 min</button>
+                    <button data-timer="10" class="flex-1 bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg font-semibold">10 min</button>
+                    <button data-timer="15" class="flex-1 bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg font-semibold">15 min</button>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-2">Custom (minutes):</label>
+                <div class="flex gap-2">
+                    <input type="number" id="custom-timer" min="1" max="60" value="30"
+                           class="w-20 border border-gray-300 rounded-lg px-3 py-2">
+                    <button id="set-custom-timer" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700">
+                        Set
+                    </button>
+                </div>
+            </div>
+        </div>
+        <p id="timer-message" class="mt-2 text-sm"></p>
+    </div>
+</div>
+
+<!-- Statistics -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <div class="text-gray-600 text-sm">Total Voters</div>
+        <div id="stat-total-voters" class="text-3xl font-bold text-blue-600">0</div>
+    </div>
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <div class="text-gray-600 text-sm">Voters Who Voted</div>
+        <div id="stat-voters-voted" class="text-3xl font-bold text-green-600">0</div>
+    </div>
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <div class="text-gray-600 text-sm">Total Votes Cast</div>
+        <div id="stat-total-votes" class="text-3xl font-bold text-purple-600">0</div>
+    </div>
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <div class="text-gray-600 text-sm">Total Cars</div>
+        <div id="stat-total-cars" class="text-3xl font-bold text-orange-600">0</div>
+    </div>
+</div>
+{{end}}
+
+{{define "scripts"}}
+<script src="/static/js/dashboard.js"></script>
+{{end}}

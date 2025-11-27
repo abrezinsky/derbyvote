@@ -1,0 +1,45 @@
+{{define "admin"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - DerbyVote</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/css/admin.css">
+</head>
+<body class="bg-gray-100">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <div class="bg-blue-600 text-white p-4 shadow-lg">
+            <h1 class="text-2xl font-bold">DerbyVote</h1>
+        </div>
+
+        <!-- Navigation -->
+        <div class="bg-white border-b">
+            <nav class="container mx-auto px-4">
+                <div class="flex space-x-6">
+                    <a href="/admin" class="py-4 px-2 border-b-2 {{if eq .ActiveNav "dashboard"}}border-blue-600 text-blue-600 font-semibold{{else}}border-transparent hover:border-gray-300 text-gray-600{{end}}">Dashboard</a>
+                    <a href="/admin/categories" class="py-4 px-2 border-b-2 {{if eq .ActiveNav "categories"}}border-blue-600 text-blue-600 font-semibold{{else}}border-transparent hover:border-gray-300 text-gray-600{{end}}">Categories</a>
+                    <a href="/admin/cars" class="py-4 px-2 border-b-2 {{if eq .ActiveNav "cars"}}border-blue-600 text-blue-600 font-semibold{{else}}border-transparent hover:border-gray-300 text-gray-600{{end}}">Cars</a>
+                    <a href="/admin/results" class="py-4 px-2 border-b-2 {{if eq .ActiveNav "results"}}border-blue-600 text-blue-600 font-semibold{{else}}border-transparent hover:border-gray-300 text-gray-600{{end}}">Results</a>
+                    <a href="/admin/voters" class="py-4 px-2 border-b-2 {{if eq .ActiveNav "voters"}}border-blue-600 text-blue-600 font-semibold{{else}}border-transparent hover:border-gray-300 text-gray-600{{end}}">Voters</a>
+                    <a href="/admin/settings" class="py-4 px-2 border-b-2 {{if eq .ActiveNav "settings"}}border-blue-600 text-blue-600 font-semibold{{else}}border-transparent hover:border-gray-300 text-gray-600{{end}}">Settings</a>
+                </div>
+            </nav>
+        </div>
+
+        <!-- Main Content -->
+        <div class="container mx-auto px-4 py-8">
+            {{template "content" .}}
+        </div>
+    </div>
+
+    <script src="/static/js/common.js"></script>
+    <script src="/static/js/admin.js"></script>
+    {{template "scripts" .}}
+</body>
+</html>
+{{end}}
+
+{{define "scripts"}}{{end}}

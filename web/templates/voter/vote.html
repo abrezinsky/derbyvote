@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DerbyVote</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .car-card {
+            transition: all 0.2s ease;
+        }
+        .car-card:active {
+            transform: scale(0.95);
+        }
+        .car-card.selected {
+            box-shadow: 0 0 0 3px #3b82f6;
+            background-color: #dbeafe;
+        }
+        .car-card img {
+            background-color: #f3f4f6;
+        }
+        .category-section {
+            display: none;
+        }
+        .category-section.active {
+            display: block;
+        }
+        .category-tab {
+            transition: all 0.2s ease;
+        }
+        .category-tab.active {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .submit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Scrollable tabs container */
+        .tabs-container {
+            position: relative;
+        }
+        .tabs-scroll {
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        .tabs-scroll::-webkit-scrollbar {
+            display: none;
+        }
+        .scroll-indicator {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(to right, rgba(255,255,255,0.9), transparent);
+            pointer-events: none;
+            z-index: 5;
+        }
+        .scroll-indicator.right {
+            right: 0;
+            background: linear-gradient(to left, rgba(255,255,255,0.9), transparent);
+        }
+        .scroll-indicator.hidden {
+            display: none;
+        }
+
+        /* Pulse animation for scroll hint */
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+        .pulse {
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        /* Voted badge (for conflicts - purple) */
+        .voted-badge {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background-color: rgba(147, 51, 234, 0.95);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            z-index: 10;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        /* Selected badge (for current vote - blue) */
+        .selected-badge {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background-color: rgba(59, 130, 246, 0.95);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            z-index: 10;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+    </style>
+    <script src="/static/js/common.js"></script>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen pb-24">
+        <!-- Header -->
+        <div class="bg-blue-600 text-white sticky top-0 z-30 shadow-lg">
+            <div class="p-4 pb-2">
+                <h1 class="text-2xl font-bold text-center">DerbyVote Awards</h1>
+                <p class="text-sm text-center mt-1 text-blue-100">Vote for your favorites!</p>
+            </div>
+
+            <!-- Status Banner -->
+            <div id="countdown-banner" class="bg-green-600 text-white p-2 text-center font-semibold">
+                <div class="flex items-center justify-center gap-2">
+                    <span id="countdown-icon">✓</span>
+                    <span id="countdown-text">Voting is open</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Instructions Banner -->
+        <div id="instructions-banner" class="bg-yellow-50 border-b border-yellow-200 p-3">
+            <div class="flex items-start gap-2">
+                <span class="text-yellow-600 text-xl">ℹ️</span>
+                <div class="flex-1 text-sm">
+                    <p class="font-semibold text-yellow-900">How voting works:</p>
+                    <p class="text-yellow-800 mt-1"><strong>Tap a car = Vote saved!</strong> It's that simple.</p>
+                    <p class="text-yellow-800">You can change votes anytime before voting closes.</p>
+                    <p class="text-yellow-800 font-medium mt-1">👉 Swipe categories to see all awards</p>
+                </div>
+                <button onclick="dismissInstructions()" class="text-yellow-600 hover:text-yellow-800 font-bold">×</button>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="flex items-center justify-center py-20">
+            <div class="text-center">
+                <div class="loading mx-auto mb-4"></div>
+                <p class="text-gray-600">Loading cars...</p>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div id="content" class="hidden">
+            <!-- Category Tabs -->
+            <div class="bg-white border-b sticky top-32 z-20 tabs-container">
+                <div id="scroll-left" class="scroll-indicator hidden">
+                    <span class="text-gray-400 text-2xl">‹</span>
+                </div>
+                <div id="tabs-scroll" class="tabs-scroll overflow-x-auto">
+                    <div id="category-tabs" class="flex space-x-1 p-2 min-w-max">
+                        <!-- Tabs will be inserted here -->
+                    </div>
+                </div>
+                <div id="scroll-right" class="scroll-indicator right pulse">
+                    <span class="text-blue-600 text-2xl font-bold">›</span>
+                </div>
+            </div>
+
+            <!-- Progress Indicator -->
+            <div id="progress-section" class="bg-white border-b p-3">
+                <div class="flex items-center justify-between text-sm">
+                    <span class="text-gray-600">Your Progress</span>
+                    <span id="progress-text" class="font-semibold text-blue-600">0 of 0 categories</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
+                    <div id="progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Category Sections -->
+            <div id="category-sections" class="p-4">
+                <!-- Category sections will be inserted here -->
+            </div>
+
+            <!-- Vote Summary (shown when done) -->
+            <div id="vote-summary" class="p-4 pb-32 hidden">
+                <h2 class="text-xl font-bold mb-4 text-gray-800">Your Votes</h2>
+                <div id="summary-list" class="space-y-3">
+                    <!-- Summary will be inserted here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Done Button (Fixed at bottom) -->
+        <div class="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-4">
+            <div id="not-done-state">
+                <button id="done-btn"
+                        class="w-full bg-green-600 text-white py-3 px-6 rounded-lg font-semibold text-lg disabled:bg-gray-400"
+                        disabled
+                        onclick="markAsDone()">
+                    I'm Done Voting
+                </button>
+                <p id="done-message" class="text-center text-sm text-gray-600 mt-2"></p>
+            </div>
+            <div id="done-state" class="hidden">
+                <div class="bg-green-50 border border-green-200 rounded-lg p-3 mb-2">
+                    <p class="text-green-800 font-semibold text-center">✓ Your votes are saved!</p>
+                    <p class="text-green-700 text-xs text-center mt-1">You can change them anytime before voting closes</p>
+                </div>
+                <button onclick="continueVoting()"
+                        class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold text-sm">
+                    Edit My Votes
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vote Conflict Modal -->
+    <div id="conflict-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 class="text-xl font-bold mb-3 text-gray-800">Switch Vote?</h3>
+            <p id="conflict-message" class="text-gray-700 mb-4"></p>
+            <div class="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-3">
+                <p class="text-sm text-purple-800">
+                    <strong>Note:</strong> You can only vote for this car once in <span id="conflict-group-name" class="font-semibold"></span>.
+                </p>
+            </div>
+            <div class="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
+                <p class="text-sm text-orange-800">
+                    <strong>⚠️ Reminder:</strong> Your vote for <span id="conflict-old-category" class="font-semibold"></span> will be cleared. You'll need to vote again in that category!
+                </p>
+            </div>
+            <div class="flex space-x-3">
+                <button id="conflict-cancel"
+                        class="flex-1 px-4 py-3 bg-gray-200 text-gray-800 rounded-lg font-semibold hover:bg-gray-300">
+                    Cancel
+                </button>
+                <button id="conflict-confirm"
+                        class="flex-1 px-4 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700">
+                    Switch Vote
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast-notification" class="hidden fixed top-20 left-1/2 transform -translate-x-1/2 z-50 max-w-sm w-full mx-4">
+        <div class="bg-orange-500 text-white px-6 py-4 rounded-lg shadow-lg">
+            <p id="toast-message" class="font-semibold text-center"></p>
+        </div>
+    </div>
+
+    <!-- Instructions Modal -->
+    <div id="instructions-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg p-6 max-w-lg w-full mx-4 shadow-xl">
+            <h3 class="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
+                <span class="text-2xl">ℹ️</span>
+                Voting Instructions
+            </h3>
+            <div id="instructions-content" class="text-gray-700 mb-6 space-y-2 max-h-96 overflow-y-auto">
+                <!-- Instructions will be inserted here -->
+            </div>
+            <button id="instructions-ok"
+                    class="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">
+                OK, Got It!
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const qrCode = "{{.QRCode}}";
+        let categories = [];
+        let cars = [];
+        let votes = {}; // category_id -> car_id
+        let currentCategoryIndex = 0;
+        let isDone = false;
+        let votingOpen = true;
+        let ws = null;
+        let hadTimer = false;
+        let pendingVote = null; // Store pending vote while showing confirmation
+        let customInstructions = ''; // Custom instructions from vote data
+
+        // WebSocket connection
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsURL = `${protocol}//${window.location.host}/ws`;
+
+            ws = new WebSocket(wsURL);
+
+            ws.onopen = function() {
+                console.log('WebSocket connected');
+            };
+
+            ws.onmessage = function(event) {
+                try {
+                    const message = JSON.parse(event.data);
+                    handleWebSocketMessage(message);
+                } catch (error) {
+                    console.error('Error parsing WebSocket message:', error);
+                }
+            };
+
+            ws.onclose = function() {
+                console.log('WebSocket disconnected, reconnecting...');
+                setTimeout(connectWebSocket, 3000); // Reconnect after 3 seconds
+            };
+
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        // Handle WebSocket messages
+        function handleWebSocketMessage(message) {
+            if (message.type === 'voting_status') {
+                const wasOpen = votingOpen;
+                votingOpen = message.payload.open;
+                const closeTime = message.payload.close_time;
+
+                if (!votingOpen) {
+                    // Voting is closed - show summary
+                    showVotingClosed();
+                } else if (votingOpen && !wasOpen) {
+                    // Voting just opened
+                    hideVotingClosed();
+                }
+            } else if (message.type === 'countdown') {
+                updateCountdown(message.payload.seconds_remaining);
+            }
+        }
+
+        // Update countdown display
+        function updateCountdown(secondsRemaining) {
+            const banner = document.getElementById('countdown-banner');
+            const icon = document.getElementById('countdown-icon');
+            const text = document.getElementById('countdown-text');
+
+            if (secondsRemaining <= 0) {
+                // Timer expired - wait for server to send voting_status
+                // Don't change the banner state here, let the WebSocket message handle it
+                if (hadTimer) {
+                    // Keep showing the expired timer state
+                    banner.className = 'bg-red-600 text-white p-3 text-center font-bold';
+                    icon.textContent = '⏱️';
+                    text.textContent = 'Time expired - closing...';
+                } else {
+                    // No timer active, show open status
+                    banner.className = 'bg-green-600 text-white p-3 text-center font-bold';
+                    icon.textContent = '✓';
+                    text.textContent = 'Voting is open';
+                }
+                return;
+            }
+
+            // We have an active timer
+            hadTimer = true;
+
+            const minutes = Math.floor(secondsRemaining / 60);
+            const seconds = secondsRemaining % 60;
+            const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+            icon.textContent = '⏱️';
+            text.textContent = `Voting closes in ${timeStr}`;
+
+            // Change color when time is running out
+            if (secondsRemaining <= 60) {
+                banner.className = 'bg-red-600 text-white p-3 text-center font-bold animate-pulse';
+            } else if (secondsRemaining <= 300) {
+                banner.className = 'bg-orange-500 text-white p-3 text-center font-bold';
+            } else {
+                banner.className = 'bg-blue-600 text-white p-3 text-center font-bold';
+            }
+        }
+
+        // Show voting closed state
+        function showVotingClosed() {
+            votingOpen = false;
+            hadTimer = false; // Reset timer flag
+
+            // Update banner to show closed state
+            const banner = document.getElementById('countdown-banner');
+            const icon = document.getElementById('countdown-icon');
+            const text = document.getElementById('countdown-text');
+
+            banner.className = 'bg-red-600 text-white p-3 text-center font-bold';
+            icon.textContent = '🔒';
+            text.textContent = 'Voting is closed';
+
+            // Show summary view
+            showSummaryView();
+
+            // Update the done state message to reflect that voting is closed
+            const doneStateMessage = document.querySelector('#done-state .bg-green-50');
+            if (doneStateMessage) {
+                doneStateMessage.innerHTML = `
+                    <p class="text-red-800 font-semibold text-center">🔒 Voting has closed</p>
+                    <p class="text-red-700 text-sm text-center mt-1">Thank you for participating! Here are your votes:</p>
+                `;
+                doneStateMessage.className = 'bg-red-50 border border-red-200 rounded-lg p-4 mb-2';
+            }
+
+            // Hide the "Edit My Votes" button since voting is closed
+            const editButton = document.querySelector('#done-state button');
+            if (editButton) {
+                editButton.classList.add('hidden');
+            }
+
+            // Show done state
+            document.getElementById('not-done-state').classList.add('hidden');
+            document.getElementById('done-state').classList.remove('hidden');
+        }
+
+        // Hide voting closed state
+        function hideVotingClosed() {
+            votingOpen = true;
+            hadTimer = false; // Reset timer flag
+
+            // Update banner to show open state
+            const banner = document.getElementById('countdown-banner');
+            const icon = document.getElementById('countdown-icon');
+            const text = document.getElementById('countdown-text');
+
+            banner.className = 'bg-green-600 text-white p-3 text-center font-bold';
+            icon.textContent = '✓';
+            text.textContent = 'Voting is open';
+
+            // Restore the done state message
+            const doneStateMessage = document.querySelector('#done-state .bg-red-50, #done-state .bg-green-50');
+            if (doneStateMessage) {
+                doneStateMessage.innerHTML = `
+                    <p class="text-green-800 font-semibold text-center">✓ Your votes are saved!</p>
+                    <p class="text-green-700 text-xs text-center mt-1">You can change them anytime before voting closes</p>
+                `;
+                doneStateMessage.className = 'bg-green-50 border border-green-200 rounded-lg p-3 mb-2';
+            }
+
+            // Show the "Edit My Votes" button again
+            const editButton = document.querySelector('#done-state button');
+            if (editButton) {
+                editButton.classList.remove('hidden');
+            }
+
+            // Show voting view
+            showVotingView();
+
+            // Show appropriate state
+            if (isDone) {
+                document.getElementById('not-done-state').classList.add('hidden');
+                document.getElementById('done-state').classList.remove('hidden');
+            } else {
+                document.getElementById('not-done-state').classList.remove('hidden');
+                document.getElementById('done-state').classList.add('hidden');
+            }
+        }
+
+        // Dismiss instructions banner
+        function dismissInstructions() {
+            document.getElementById('instructions-banner').style.display = 'none';
+            localStorage.setItem('instructions-dismissed', 'true');
+        }
+
+        // Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Check if instructions banner should be shown
+        function checkInstructions() {
+            if (localStorage.getItem('instructions-dismissed') === 'true') {
+                document.getElementById('instructions-banner').style.display = 'none';
+            }
+        }
+
+        // Update scroll indicators
+        function updateScrollIndicators() {
+            const scrollContainer = document.getElementById('tabs-scroll');
+            const leftIndicator = document.getElementById('scroll-left');
+            const rightIndicator = document.getElementById('scroll-right');
+
+            const scrollLeft = scrollContainer.scrollLeft;
+            const scrollWidth = scrollContainer.scrollWidth;
+            const clientWidth = scrollContainer.clientWidth;
+
+            // Show/hide left indicator
+            if (scrollLeft > 10) {
+                leftIndicator.classList.remove('hidden');
+            } else {
+                leftIndicator.classList.add('hidden');
+            }
+
+            // Show/hide right indicator
+            if (scrollLeft < scrollWidth - clientWidth - 10) {
+                rightIndicator.classList.remove('hidden');
+                rightIndicator.classList.add('pulse');
+            } else {
+                rightIndicator.classList.add('hidden');
+                rightIndicator.classList.remove('pulse');
+            }
+        }
+
+        // Render vote summary
+        function renderVoteSummary() {
+            const summaryList = document.getElementById('summary-list');
+
+            summaryList.innerHTML = categories.map(cat => {
+                const carId = votes[cat.id];
+                const car = carId ? cars.find(c => c.id === carId) : null;
+
+                if (car) {
+                    return `
+                        <div class="bg-white border-2 border-gray-200 rounded-lg p-3 flex items-center gap-3">
+                            <img src="/cars/${car.id}/photo"
+                                 alt="Car ${car.car_number}"
+                                 class="w-24 h-auto object-contain rounded">
+                            <div class="flex-1">
+                                <div class="text-sm text-gray-600">${cat.name}</div>
+                                <div class="font-bold text-2xl text-blue-600">#${car.car_number}</div>
+                            </div>
+                            <div class="text-green-600 text-2xl">✓</div>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="bg-gray-50 border-2 border-gray-200 rounded-lg p-3 flex items-center gap-3">
+                            <div class="w-24 h-16 bg-gray-200 rounded flex items-center justify-center">
+                                <span class="text-gray-400 text-3xl">?</span>
+                            </div>
+                            <div class="flex-1">
+                                <div class="text-sm text-gray-600">${cat.name}</div>
+                                <div class="text-sm text-gray-500 italic">No vote yet</div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }).join('');
+        }
+
+        // Show vote summary view
+        function showSummaryView() {
+            renderVoteSummary();
+            document.getElementById('category-sections').classList.add('hidden');
+            document.getElementById('vote-summary').classList.remove('hidden');
+
+            // Hide category tabs, progress, and instructions
+            document.querySelector('.tabs-container').classList.add('hidden');
+            document.getElementById('progress-section').classList.add('hidden');
+            document.getElementById('instructions-banner').classList.add('hidden');
+        }
+
+        // Show voting view
+        function showVotingView() {
+            document.getElementById('vote-summary').classList.add('hidden');
+            document.getElementById('category-sections').classList.remove('hidden');
+
+            // Show category tabs and progress
+            document.querySelector('.tabs-container').classList.remove('hidden');
+            document.getElementById('progress-section').classList.remove('hidden');
+
+            // Show instructions if not dismissed
+            if (localStorage.getItem('instructions-dismissed') !== 'true') {
+                document.getElementById('instructions-banner').classList.remove('hidden');
+            }
+        }
+
+        // Mark as done
+        function markAsDone() {
+            // Check if all categories have votes
+            const missingCategories = categories.filter(cat => !votes[cat.id]);
+
+            if (missingCategories.length > 0) {
+                // Find the index of the first missing category
+                const firstMissingIndex = categories.findIndex(cat => cat.id === missingCategories[0].id);
+
+                // Jump to that category
+                showCategory(firstMissingIndex);
+
+                // Show toast notification
+                showToast(`Please vote in "${missingCategories[0].name}"! (${missingCategories.length} categories left)`, 4000);
+
+                // Scroll to top to see the category
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+
+                return; // Don't mark as done yet
+            }
+
+            // All categories voted, proceed with marking as done
+            isDone = true;
+            localStorage.setItem(`voter-done-${qrCode}`, 'true');
+            showSummaryView();
+            document.getElementById('not-done-state').classList.add('hidden');
+            document.getElementById('done-state').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Continue voting
+        function continueVoting() {
+            isDone = false;
+            localStorage.setItem(`voter-done-${qrCode}`, 'false');
+            showVotingView();
+            document.getElementById('done-state').classList.add('hidden');
+            document.getElementById('not-done-state').classList.remove('hidden');
+        }
+
+        // Check if voter previously marked as done
+        function checkDoneState() {
+            const wasDone = localStorage.getItem(`voter-done-${qrCode}`) === 'true';
+            if (wasDone) {
+                isDone = true;
+                showSummaryView();
+                document.getElementById('not-done-state').classList.add('hidden');
+                document.getElementById('done-state').classList.remove('hidden');
+            }
+        }
+
+        // Show instructions modal
+        function showInstructionsModal() {
+            if (!customInstructions) return;
+
+            // Check if already acknowledged
+            const key = `instructions-acknowledged-${qrCode}`;
+            if (localStorage.getItem(key) === 'true') {
+                return;
+            }
+
+            // Display instructions
+            const contentEl = document.getElementById('instructions-content');
+            const lines = customInstructions.split('\n').filter(line => line.trim());
+
+            contentEl.innerHTML = lines.map(line =>
+                `<p class="text-gray-700">${escapeHtml(line)}</p>`
+            ).join('');
+
+            // Show modal
+            document.getElementById('instructions-modal').classList.remove('hidden');
+        }
+
+        // Hide instructions modal
+        function hideInstructionsModal() {
+            const key = `instructions-acknowledged-${qrCode}`;
+            localStorage.setItem(key, 'true');
+            document.getElementById('instructions-modal').classList.add('hidden');
+        }
+
+        // Initialize the page
+        async function init() {
+            try {
+                const response = await fetch(`/api/vote-data/${qrCode}`);
+                const data = await response.json();
+
+                categories = data.categories;
+                cars = data.cars;
+                votes = data.votes || {};
+                customInstructions = data.instructions || '';
+
+                renderCategoryTabs();
+                renderCategorySections();
+                updateProgress();
+                updateDoneButton();
+
+                // Show first category
+                showCategory(0);
+
+                // Check instructions (kept for banner)
+                checkInstructions();
+
+                // Check if user previously marked as done
+                checkDoneState();
+
+                // Setup scroll listener for indicators
+                const scrollContainer = document.getElementById('tabs-scroll');
+                scrollContainer.addEventListener('scroll', updateScrollIndicators);
+                updateScrollIndicators();
+
+                // Hide loading, show content
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('content').classList.remove('hidden');
+
+                // Show instructions modal if configured
+                showInstructionsModal();
+
+                // Connect to WebSocket
+                connectWebSocket();
+
+                // Setup conflict modal event listeners
+                document.getElementById('conflict-cancel').addEventListener('click', hideConflictModal);
+                document.getElementById('conflict-confirm').addEventListener('click', confirmVoteSwitch);
+
+                // Setup instructions modal event listener
+                document.getElementById('instructions-ok').addEventListener('click', hideInstructionsModal);
+            } catch (error) {
+                console.error('Error loading data:', error);
+                alert('Error loading voting data. Please try again.');
+            }
+        }
+
+        // Render category tabs
+        function renderCategoryTabs() {
+            const tabsContainer = document.getElementById('category-tabs');
+            tabsContainer.innerHTML = categories.map((cat, index) => `
+                <button class="category-tab px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap bg-gray-100 text-gray-700"
+                        data-index="${index}"
+                        onclick="showCategory(${index})">
+                    ${cat.name}
+                    <span class="vote-indicator ml-1" data-category-id="${cat.id}">
+                        ${votes[cat.id] ? '✓' : ''}
+                    </span>
+                </button>
+            `).join('');
+        }
+
+        // Helper function to find categories that share an exclusivity pool
+        function getCategoriesInSamePool(categoryId) {
+            const category = categories.find(c => c.id === categoryId);
+            if (!category || !category.exclusivity_pool_id) {
+                return [];
+            }
+
+            return categories.filter(c =>
+                c.exclusivity_pool_id === category.exclusivity_pool_id
+            );
+        }
+
+        // Helper function to check if a car has been voted for in any category in the same pool
+        function getExistingVoteInPool(categoryId, carId) {
+            const poolCategories = getCategoriesInSamePool(categoryId);
+
+            for (const cat of poolCategories) {
+                if (cat.id !== categoryId && votes[cat.id] === carId) {
+                    return cat; // Return the category they voted for this car in
+                }
+            }
+
+            return null;
+        }
+
+        // Render category sections with car grids
+        function renderCategorySections() {
+            const sectionsContainer = document.getElementById('category-sections');
+            sectionsContainer.innerHTML = categories.map(cat => {
+                const poolCategories = getCategoriesInSamePool(cat.id);
+
+                return `
+                    <div class="category-section" data-category-id="${cat.id}">
+                        <h2 class="text-xl font-bold mb-4 text-gray-800">${cat.name}</h2>
+                        <p class="text-sm text-gray-600 mb-4">Tap a car to vote - it saves instantly!</p>
+                        <div class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+                            ${cars.map(car => {
+                                // Check if this car is voted for in this category or another
+                                let badge = '';
+
+                                // First check if this is the voted car in THIS category
+                                if (votes[cat.id] === car.id) {
+                                    badge = `<div class="selected-badge">VOTED</div>`;
+                                }
+                                // Otherwise check if voted in another category in the same pool
+                                else if (poolCategories.length > 0) {
+                                    const existingVote = getExistingVoteInPool(cat.id, car.id);
+                                    if (existingVote) {
+                                        badge = `<div class="voted-badge">${existingVote.name}</div>`;
+                                    }
+                                }
+
+                                return `
+                                    <div class="car-card border-2 rounded-lg overflow-hidden cursor-pointer bg-white relative"
+                                         data-car-id="${car.id}"
+                                         data-category-id="${cat.id}"
+                                         onclick="selectCar(${cat.id}, ${car.id})">
+                                        ${badge}
+                                        <img src="/cars/${car.id}/photo"
+                                             alt="Car ${car.car_number}"
+                                             class="w-full h-auto object-contain"
+                                             loading="lazy">
+                                        <div class="p-2 text-center">
+                                            <div class="font-bold text-xl text-blue-600">#${car.car_number}</div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Show specific category
+        function showCategory(index) {
+            currentCategoryIndex = index;
+            const categoryId = categories[index].id;
+
+            // Update tabs
+            const allTabs = document.querySelectorAll('.category-tab');
+            allTabs.forEach((tab, i) => {
+                if (i === index) {
+                    tab.classList.add('active');
+                    // Scroll active tab into view
+                    tab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                } else {
+                    tab.classList.remove('active');
+                }
+            });
+
+            // Update sections
+            document.querySelectorAll('.category-section').forEach(section => {
+                if (parseInt(section.dataset.categoryId) === categoryId) {
+                    section.classList.add('active');
+                } else {
+                    section.classList.remove('active');
+                }
+            });
+
+            // Update card selections
+            updateCardSelections();
+
+            // Update scroll indicators after tab scroll
+            setTimeout(updateScrollIndicators, 100);
+
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Select a car for a category - SAVES IMMEDIATELY
+        async function selectCar(categoryId, carId) {
+            // Check for exclusivity conflict (only if not deselecting current vote)
+            if (votes[categoryId] !== carId) {
+                const existingVote = getExistingVoteInPool(categoryId, carId);
+
+                if (existingVote) {
+                    // Show confirmation modal
+                    showConflictModal(categoryId, carId, existingVote);
+                    return;
+                }
+            }
+
+            // No conflict, proceed with vote
+            await submitVote(categoryId, carId);
+        }
+
+        // Show conflict modal
+        function showConflictModal(categoryId, carId, existingVoteCategory) {
+            const car = cars.find(c => c.id === carId);
+            const currentCategory = categories.find(c => c.id === categoryId);
+
+            pendingVote = { categoryId, carId, clearedCategoryName: existingVoteCategory.name };
+
+            const message = `You already voted for Car #${car.car_number} in "${existingVoteCategory.name}". Do you want to switch your vote to "${currentCategory.name}" instead?`;
+
+            document.getElementById('conflict-message').textContent = message;
+            document.getElementById('conflict-group-name').textContent = currentCategory.group_name || 'this group';
+            document.getElementById('conflict-old-category').textContent = existingVoteCategory.name;
+            document.getElementById('conflict-modal').classList.remove('hidden');
+        }
+
+        // Hide conflict modal
+        function hideConflictModal() {
+            document.getElementById('conflict-modal').classList.add('hidden');
+            pendingVote = null;
+        }
+
+        // Show toast notification
+        function showToast(message, duration = 5000) {
+            const toast = document.getElementById('toast-notification');
+            const toastMessage = document.getElementById('toast-message');
+
+            toastMessage.textContent = message;
+            toast.classList.remove('hidden');
+
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, duration);
+        }
+
+        // Confirm vote switch
+        async function confirmVoteSwitch() {
+            if (!pendingVote) return;
+
+            const { categoryId, carId, clearedCategoryName } = pendingVote;
+            hideConflictModal();
+            await submitVote(categoryId, carId);
+
+            // Show reminder toast
+            showToast(`Don't forget to vote again in "${clearedCategoryName}"!`);
+        }
+
+        // Submit vote (extracted from selectCar)
+        async function submitVote(categoryId, carId) {
+            // Update votes locally
+            if (votes[categoryId] === carId) {
+                // Deselect if already selected
+                delete votes[categoryId];
+            } else {
+                votes[categoryId] = carId;
+            }
+
+            // Update UI immediately
+            updateCardSelections();
+            updateProgress();
+            updateDoneButton();
+            updateVoteIndicators();
+
+            // Save to server in background
+            try {
+                const response = await fetch('/api/vote', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        voter_qr: qrCode,
+                        category_id: categoryId,
+                        car_id: votes[categoryId] || 0 // 0 means deselect
+                    })
+                });
+
+                if (!response.ok) {
+                    console.error('Failed to save vote');
+                } else {
+                    // Check if backend cleared a conflict
+                    const data = await response.json();
+                    if (data.conflict_cleared) {
+                        // Remove the conflicting vote from local state
+                        delete votes[data.conflict_category_id];
+                    }
+
+                    // Re-render to update badges across all categories
+                    renderCategorySections();
+                    updateCardSelections();
+                    updateVoteIndicators();
+                }
+            } catch (error) {
+                console.error('Error saving vote:', error);
+            }
+
+            // Auto-advance to next category if not last (after server response completes)
+            if (votes[categoryId] && currentCategoryIndex < categories.length - 1) {
+                setTimeout(() => {
+                    showCategory(currentCategoryIndex + 1);
+                }, 300);
+            }
+        }
+
+        // Update card selection styles
+        function updateCardSelections() {
+            const currentCategoryId = categories[currentCategoryIndex].id;
+            document.querySelectorAll(`.category-section[data-category-id="${currentCategoryId}"] .car-card`).forEach(card => {
+                const carId = parseInt(card.dataset.carId);
+                if (votes[currentCategoryId] === carId) {
+                    card.classList.add('selected');
+                } else {
+                    card.classList.remove('selected');
+                }
+            });
+        }
+
+        // Update vote indicators on tabs
+        function updateVoteIndicators() {
+            document.querySelectorAll('.vote-indicator').forEach(indicator => {
+                const categoryId = parseInt(indicator.dataset.categoryId);
+                indicator.textContent = votes[categoryId] ? '✓' : '';
+            });
+        }
+
+        // Update progress bar
+        function updateProgress() {
+            const totalCategories = categories.length;
+            const votedCategories = Object.keys(votes).length;
+            const percentage = (votedCategories / totalCategories) * 100;
+
+            document.getElementById('progress-bar').style.width = `${percentage}%`;
+            document.getElementById('progress-text').textContent = `${votedCategories} of ${totalCategories} categories`;
+        }
+
+        // Update done button state
+        function updateDoneButton() {
+            const doneBtn = document.getElementById('done-btn');
+            const doneMessage = document.getElementById('done-message');
+            const votedCategories = Object.keys(votes).length;
+            const totalCategories = categories.length;
+
+            if (votedCategories === 0) {
+                doneBtn.disabled = true;
+                doneMessage.textContent = 'Tap cars to vote - your choices save automatically';
+            } else if (votedCategories < totalCategories) {
+                doneBtn.disabled = false;
+                doneMessage.innerHTML = `${votedCategories} of ${totalCategories} categories voted<br><span class="text-xs text-gray-500">Each tap saves automatically</span>`;
+            } else {
+                doneBtn.disabled = false;
+                doneMessage.innerHTML = 'All categories voted!<br><span class="text-xs text-gray-500">Every selection is already saved</span>';
+            }
+        }
+
+        // Initialize on page load
+        init();
+    </script>
+</body>
+</html>

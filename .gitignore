@@ -1,0 +1,41 @@
+# Binaries
+derbyvote
+derbyvote-*
+*.exe
+
+# Build directories
+build/
+bin/
+
+# Database files
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Test artifacts
+coverage.out
+coverage.html
+*.test
+
+# Temporary files
+tmp/
+*.tmp
+*.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Go workspace
+go.work
+go.work.sum

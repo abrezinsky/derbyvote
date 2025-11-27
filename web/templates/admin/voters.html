@@ -1,0 +1,149 @@
+{{template "admin" .}}
+
+{{define "content"}}
+<!-- Actions Bar -->
+<div class="bg-white rounded-lg shadow-lg p-6 mb-6 no-print">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-4">
+            <button id="add-voter" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700">
+                + Add Voter
+            </button>
+            <select id="filter-type" class="border border-gray-300 rounded-lg px-4 py-2">
+                <option value="">All Types</option>
+                <option value="racer">Racers</option>
+                <option value="general">General</option>
+                <option value="committee">Committee</option>
+                <option value="staff">Staff</option>
+            </select>
+        </div>
+        <button id="export-qr" class="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700">
+            Print QR Codes
+        </button>
+    </div>
+</div>
+
+<!-- Voters Table -->
+<div class="bg-white rounded-lg shadow-lg overflow-hidden no-print">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QR Code</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Car</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+        </thead>
+        <tbody id="voters-table" class="bg-white divide-y divide-gray-200">
+            <!-- Voters will be inserted here -->
+        </tbody>
+    </table>
+</div>
+
+<!-- Add/Edit Voter Modal -->
+<div id="voter-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 no-print">
+    <div class="bg-white rounded-lg p-8 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <h3 id="modal-title" class="text-xl font-bold mb-4">Add Voter</h3>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Name</label>
+                <input type="text" id="voter-name" class="w-full border border-gray-300 rounded-lg px-4 py-2" placeholder="Full name">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                <input type="email" id="voter-email" class="w-full border border-gray-300 rounded-lg px-4 py-2" placeholder="email@example.com">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Voter Type</label>
+                <select id="voter-type" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+                    <option value="general">General</option>
+                    <option value="racer">Racer</option>
+                    <option value="committee">Committee Member</option>
+                    <option value="staff">Staff</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Link to Car (Optional)</label>
+                <select id="voter-car" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+                    <option value="">None</option>
+                    <!-- Cars will be loaded here -->
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                <textarea id="voter-notes" rows="3" class="w-full border border-gray-300 rounded-lg px-4 py-2" placeholder="Additional information..."></textarea>
+            </div>
+            <div id="qr-code-display" class="hidden">
+                <label class="block text-sm font-medium text-gray-700 mb-2">QR Code</label>
+                <div class="bg-gray-100 p-4 rounded-lg text-center">
+                    <img id="voter-qr-image" src="" alt="QR Code" class="mx-auto mb-2" style="width: 300px; height: 300px;">
+                    <div class="font-mono text-lg font-semibold text-gray-700" id="voter-qr-code"></div>
+                </div>
+            </div>
+        </div>
+        <div class="flex justify-end space-x-4 mt-6">
+            <button id="modal-cancel" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
+            <button id="modal-save" class="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- QR Code View Modal -->
+<div id="qr-modal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 no-print">
+    <div class="bg-white rounded-lg p-8 max-w-lg mx-4" onclick="event.stopPropagation()">
+        <div class="flex justify-between items-center mb-4">
+            <h3 id="modal-qr-title" class="text-xl font-bold">QR Code</h3>
+            <button onclick="closeQRModal()" class="text-gray-600 hover:text-gray-800 text-2xl">&times;</button>
+        </div>
+        <img id="modal-qr-image" src="" alt="QR Code" class="mx-auto" style="width: 400px; height: 400px;">
+    </div>
+</div>
+
+<!-- QR Codes Print View -->
+<div id="qr-print-view" class="hidden">
+    <div id="qr-grid" class="grid grid-cols-4 gap-4">
+        <!-- QR codes for printing -->
+    </div>
+</div>
+{{end}}
+
+{{define "scripts"}}
+<style media="print">
+    @page {
+        size: letter;
+        margin: 0.5in;
+    }
+    /* Hide everything except print view */
+    .no-print, nav, header, footer, #toast-container {
+        display: none !important;
+    }
+    /* Show and position print view */
+    #qr-print-view {
+        display: block !important;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+    }
+    #qr-grid {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+    }
+    .qr-card {
+        page-break-inside: avoid;
+        break-inside: avoid;
+        border: 2px solid #000 !important;
+        padding: 1rem;
+        text-align: center;
+        background: white;
+    }
+    .qr-card img {
+        width: 150px !important;
+        height: 150px !important;
+        margin: 0 auto;
+    }
+</style>
+<script src="/static/js/voters.js"></script>
+{{end}}
