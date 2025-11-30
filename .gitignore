@@ -1,6 +1,6 @@
-# Binaries
-derbyvote
-derbyvote-*
+# Binaries (only in root directory)
+/derbyvote
+/derbyvote-*
 *.exe
 
 # Build directories
