@@ -24,26 +24,27 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y gcc
+        sudo apt-get install -y gcc cmake
 
     - name: Run tests
-      run: go test -v -cover ./...
+      run: |
+        mkdir build
+        cd build
+        cmake ..
+        cmake --build . --target test
 
     - name: Build binary
-      env:
-        CGO_ENABLED: 1
-        GOOS: linux
-        GOARCH: amd64
       run: |
-        go build -v -ldflags "-X main.version=${{ github.ref_name }}" -o derbyvote ./cmd/derbyvote
-        chmod +x derbyvote
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=Release -DGO_LDFLAGS="-X main.version=${{ github.ref_name }}" ..
+        cmake --build . --target build-linux-amd64
 
     - name: Verify binary
-      run: ./derbyvote -version || true
+      run: ./build/bin/derbyvote-linux-amd64 -version || true
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: derbyvote-linux-amd64
-        path: derbyvote
+        path: build/bin/derbyvote-linux-amd64
         retention-days: 30
