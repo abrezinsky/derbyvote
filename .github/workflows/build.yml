@@ -40,11 +40,11 @@ jobs:
         cmake --build . --target build-linux-amd64
 
     - name: Verify binary
-      run: ./build/bin/derbyvote-linux-amd64 -version || true
+      run: ./bin/derbyvote-linux-amd64 -version || true
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: derbyvote-linux-amd64
-        path: build/bin/derbyvote-linux-amd64
+        path: bin/derbyvote-linux-amd64
         retention-days: 30
