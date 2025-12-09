@@ -160,13 +160,27 @@ Available targets:
 CGO is required for SQLite. Install appropriate cross-compilers:
 
 ```bash
-# ARM64 Linux
-sudo apt install gcc-aarch64-linux-gnu
+# Install all cross-compilers on Ubuntu
+sudo apt-get install -y \
+  gcc-aarch64-linux-gnu \
+  gcc-arm-linux-gnueabihf \
+  gcc-mingw-w64-x86-64 \
+  gcc-mingw-w64-aarch64
+
+# Linux ARM64
 CC=aarch64-linux-gnu-gcc GOOS=linux GOARCH=arm64 go build
 
+# Linux ARMv7 (Raspberry Pi 2/3)
+CC=arm-linux-gnueabihf-gcc GOOS=linux GOARCH=arm GOARM=7 go build
+
+# Linux ARMv6 (Raspberry Pi Zero/1)
+CC=arm-linux-gnueabihf-gcc GOOS=linux GOARCH=arm GOARM=6 go build
+
 # Windows AMD64
-sudo apt install gcc-mingw-w64-x86-64
 CC=x86_64-w64-mingw32-gcc GOOS=windows GOARCH=amd64 go build
+
+# Windows ARM64
+CC=aarch64-w64-mingw32-gcc GOOS=windows GOARCH=arm64 go build
 
 # macOS (must build natively on macOS)
 GOOS=darwin GOARCH=amd64 go build    # Intel
@@ -174,11 +188,14 @@ GOOS=darwin GOARCH=arm64 go build    # Apple Silicon
 ```
 
 CMake targets for cross-compilation:
-- `build-linux-amd64`
-- `build-linux-arm64`
-- `build-windows-amd64`
-- `build-darwin-amd64`
-- `build-darwin-arm64`
+- `build-linux-amd64` - Linux x64
+- `build-linux-arm64` - Linux ARM64 (Raspberry Pi 3/4/5)
+- `build-linux-armv7` - Linux ARMv7 (Raspberry Pi 2/3)
+- `build-linux-armv6` - Linux ARMv6 (Raspberry Pi Zero/1)
+- `build-windows-amd64` - Windows x64
+- `build-windows-arm64` - Windows ARM64
+- `build-darwin-amd64` - macOS Intel
+- `build-darwin-arm64` - macOS Apple Silicon
 - `build-all` (requires all cross-compilers)
 
 ---

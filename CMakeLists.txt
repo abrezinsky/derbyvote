@@ -164,11 +164,14 @@ install(DIRECTORY ${TEMPLATES_DIR}
 
 # Cross-compilation targets
 set(CROSS_COMPILE_TARGETS
-    "linux-amd64:linux:amd64"
-    "linux-arm64:linux:arm64"
-    "darwin-amd64:darwin:amd64"
-    "darwin-arm64:darwin:arm64"
-    "windows-amd64:windows:amd64"
+    "linux-amd64:linux:amd64::gcc"
+    "linux-arm64:linux:arm64::aarch64-linux-gnu-gcc"
+    "linux-armv7:linux:arm:7:arm-linux-gnueabihf-gcc"
+    "linux-armv6:linux:arm:6:arm-linux-gnueabihf-gcc"
+    "darwin-amd64:darwin:amd64::"
+    "darwin-arm64:darwin:arm64::"
+    "windows-amd64:windows:amd64::x86_64-w64-mingw32-gcc"
+    "windows-arm64:windows:arm64::aarch64-w64-mingw32-gcc"
 )
 
 foreach(target ${CROSS_COMPILE_TARGETS})
@@ -176,14 +179,24 @@ foreach(target ${CROSS_COMPILE_TARGETS})
     list(GET target_parts 0 target_name)
     list(GET target_parts 1 target_os)
     list(GET target_parts 2 target_arch)
+    list(GET target_parts 3 goarm)
+    list(GET target_parts 4 cc)
 
     set(output_name derbyvote-${target_name})
     if(target_os STREQUAL "windows")
         set(output_name ${output_name}.exe)
     endif()
 
+    set(env_vars CGO_ENABLED=1 GOOS=${target_os} GOARCH=${target_arch})
+    if(NOT goarm STREQUAL "")
+        list(APPEND env_vars GOARM=${goarm})
+    endif()
+    if(NOT cc STREQUAL "")
+        list(APPEND env_vars CC=${cc})
+    endif()
+
     add_custom_target(build-${target_name}
-        COMMAND ${CMAKE_COMMAND} -E env CGO_ENABLED=1 GOOS=${target_os} GOARCH=${target_arch}
+        COMMAND ${CMAKE_COMMAND} -E env ${env_vars}
             ${GO_EXECUTABLE} build
             ${GO_BUILD_FLAGS}
             -ldflags "-s -w"
@@ -199,9 +212,12 @@ add_custom_target(build-all
     DEPENDS
         build-linux-amd64
         build-linux-arm64
+        build-linux-armv7
+        build-linux-armv6
         build-darwin-amd64
         build-darwin-arm64
         build-windows-amd64
+        build-windows-arm64
     COMMENT "Building for all platforms..."
 )
 
@@ -233,12 +249,15 @@ add_custom_target(help-targets
     COMMAND ${CMAKE_COMMAND} -E echo "  clean-go       - Clean Go build cache"
     COMMAND ${CMAKE_COMMAND} -E echo "  package        - Create distribution archive"
     COMMAND ${CMAKE_COMMAND} -E echo ""
-    COMMAND ${CMAKE_COMMAND} -E echo "Cross-compilation targets (all with CGO_ENABLED=0):"
+    COMMAND ${CMAKE_COMMAND} -E echo "Cross-compilation targets (requires cross-compilers):"
     COMMAND ${CMAKE_COMMAND} -E echo "  build-linux-amd64   - Build for Linux x64"
-    COMMAND ${CMAKE_COMMAND} -E echo "  build-linux-arm64   - Build for Linux ARM64"
-    COMMAND ${CMAKE_COMMAND} -E echo "  build-darwin-amd64  - Build for macOS x64"
-    COMMAND ${CMAKE_COMMAND} -E echo "  build-darwin-arm64  - Build for macOS ARM64"
+    COMMAND ${CMAKE_COMMAND} -E echo "  build-linux-arm64   - Build for Linux ARM64 (Pi 3/4/5)"
+    COMMAND ${CMAKE_COMMAND} -E echo "  build-linux-armv7   - Build for Linux ARMv7 (Pi 2/3)"
+    COMMAND ${CMAKE_COMMAND} -E echo "  build-linux-armv6   - Build for Linux ARMv6 (Pi Zero/1)"
+    COMMAND ${CMAKE_COMMAND} -E echo "  build-darwin-amd64  - Build for macOS Intel"
+    COMMAND ${CMAKE_COMMAND} -E echo "  build-darwin-arm64  - Build for macOS Apple Silicon"
     COMMAND ${CMAKE_COMMAND} -E echo "  build-windows-amd64 - Build for Windows x64"
+    COMMAND ${CMAKE_COMMAND} -E echo "  build-windows-arm64 - Build for Windows ARM64"
     COMMAND ${CMAKE_COMMAND} -E echo "  build-all           - Build for all platforms"
     COMMAND ${CMAKE_COMMAND} -E echo ""
     COMMAND ${CMAKE_COMMAND} -E echo "For release build: cmake -DCMAKE_BUILD_TYPE=Release .."
