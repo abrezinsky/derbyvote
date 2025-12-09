@@ -145,11 +145,11 @@ jobs:
       matrix:
         include:
           - arch: darwin-amd64
-            runner: macos-12
+            runner: macos-15-intel
             goos: darwin
             goarch: amd64
           - arch: darwin-arm64
-            runner: macos-14
+            runner: macos-latest
             goos: darwin
             goarch: arm64
 
