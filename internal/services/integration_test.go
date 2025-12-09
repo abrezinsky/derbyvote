@@ -1171,7 +1171,7 @@ func TestIntegration_CompleteEndToEndWorkflow(t *testing.T) {
 		GroupID:      &g2Int,
 		DisplayOrder: 3,
 	})
-	_, _ = categorySvc.CreateCategory(ctx, services.Category{
+	categorySvc.CreateCategory(ctx, services.Category{
 		Name:         "Best Paint Job",
 		GroupID:      &g2Int,
 		DisplayOrder: 4,

@@ -164,8 +164,7 @@ CGO is required for SQLite. Install appropriate cross-compilers:
 sudo apt-get install -y \
   gcc-aarch64-linux-gnu \
   gcc-arm-linux-gnueabihf \
-  gcc-mingw-w64-x86-64 \
-  gcc-mingw-w64-aarch64
+  gcc-mingw-w64-x86-64
 
 # Linux ARM64
 CC=aarch64-linux-gnu-gcc GOOS=linux GOARCH=arm64 go build
@@ -179,9 +178,6 @@ CC=arm-linux-gnueabihf-gcc GOOS=linux GOARCH=arm GOARM=6 go build
 # Windows AMD64
 CC=x86_64-w64-mingw32-gcc GOOS=windows GOARCH=amd64 go build
 
-# Windows ARM64
-CC=aarch64-w64-mingw32-gcc GOOS=windows GOARCH=arm64 go build
-
 # macOS (must build natively on macOS)
 GOOS=darwin GOARCH=amd64 go build    # Intel
 GOOS=darwin GOARCH=arm64 go build    # Apple Silicon
@@ -193,7 +189,6 @@ CMake targets for cross-compilation:
 - `build-linux-armv7` - Linux ARMv7 (Raspberry Pi 2/3)
 - `build-linux-armv6` - Linux ARMv6 (Raspberry Pi Zero/1)
 - `build-windows-amd64` - Windows x64
-- `build-windows-arm64` - Windows ARM64
 - `build-darwin-amd64` - macOS Intel
 - `build-darwin-arm64` - macOS Apple Silicon
 - `build-all` (requires all cross-compilers)

@@ -171,7 +171,6 @@ set(CROSS_COMPILE_TARGETS
     "darwin-amd64:darwin:amd64::"
     "darwin-arm64:darwin:arm64::"
     "windows-amd64:windows:amd64::x86_64-w64-mingw32-gcc"
-    "windows-arm64:windows:arm64::aarch64-w64-mingw32-gcc"
 )
 
 foreach(target ${CROSS_COMPILE_TARGETS})
@@ -217,7 +216,6 @@ add_custom_target(build-all
         build-darwin-amd64
         build-darwin-arm64
         build-windows-amd64
-        build-windows-arm64
     COMMENT "Building for all platforms..."
 )
 
@@ -257,7 +255,6 @@ add_custom_target(help-targets
     COMMAND ${CMAKE_COMMAND} -E echo "  build-darwin-amd64  - Build for macOS Intel"
     COMMAND ${CMAKE_COMMAND} -E echo "  build-darwin-arm64  - Build for macOS Apple Silicon"
     COMMAND ${CMAKE_COMMAND} -E echo "  build-windows-amd64 - Build for Windows x64"
-    COMMAND ${CMAKE_COMMAND} -E echo "  build-windows-arm64 - Build for Windows ARM64"
     COMMAND ${CMAKE_COMMAND} -E echo "  build-all           - Build for all platforms"
     COMMAND ${CMAKE_COMMAND} -E echo ""
     COMMAND ${CMAKE_COMMAND} -E echo "For release build: cmake -DCMAKE_BUILD_TYPE=Release .."
