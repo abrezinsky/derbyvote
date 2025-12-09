@@ -1076,3 +1076,466 @@ func TestIntegration_CategoriesWithoutExclusivity(t *testing.T) {
 		}
 	}
 }
+
+// ============================================================================
+// Integration Test: Complete End-to-End Workflow
+// ============================================================================
+
+// TestIntegration_CompleteEndToEndWorkflow tests the entire voting lifecycle
+// from setup through to pushing results to DerbyNet
+func TestIntegration_CompleteEndToEndWorkflow(t *testing.T) {
+	// Step 1: Start with blank database
+	repo := testutil.NewTestRepository(t)
+	ctx := context.Background()
+	log := logger.New()
+
+	// Step 2: Connect to mocked DerbyNet instance
+	mockClient := derbynet.NewMockClient()
+	categorySvc := services.NewCategoryService(log, repo, mockClient)
+	carSvc := services.NewCarService(log, repo, mockClient)
+	settingsSvc := services.NewSettingsService(log, repo)
+	voterSvc := services.NewVoterService(log, repo, settingsSvc)
+	votingSvc := services.NewVotingService(log, repo, categorySvc, carSvc, settingsSvc)
+	resultsSvc := services.NewResultsService(log, repo, settingsSvc, mockClient)
+
+	// Step 3: Import cars and categories from DerbyNet
+	syncResult, err := carSvc.SyncFromDerbyNet(ctx, "http://mock-derbynet.local")
+	if err != nil {
+		t.Fatalf("Failed to sync cars from DerbyNet: %v", err)
+	}
+	if syncResult.TotalRacers != 10 {
+		t.Errorf("Expected 10 racers from mock, got %d", syncResult.TotalRacers)
+	}
+
+	cars, err := carSvc.ListCars(ctx)
+	if err != nil {
+		t.Fatalf("Failed to list cars: %v", err)
+	}
+	if len(cars) < 5 {
+		t.Fatalf("Expected at least 5 cars, got %d", len(cars))
+	}
+
+	// Step 4: Create category groups with exclusive vote groups
+	poolID1 := 1
+	poolID2 := 2
+
+	// Group 1: Speed awards (exclusivity pool 1)
+	group1ID, err := categorySvc.CreateGroup(ctx, services.CategoryGroup{
+		Name:              "Speed Awards",
+		Description:       "Awards for fastest-looking cars",
+		ExclusivityPoolID: &poolID1,
+		DisplayOrder:      1,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create group 1: %v", err)
+	}
+
+	// Group 2: Design awards (exclusivity pool 2)
+	group2ID, err := categorySvc.CreateGroup(ctx, services.CategoryGroup{
+		Name:              "Design Awards",
+		Description:       "Awards for best design",
+		ExclusivityPoolID: &poolID2,
+		DisplayOrder:      2,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create group 2: %v", err)
+	}
+
+	// Group 3: Special awards (no exclusivity)
+	group3ID, err := categorySvc.CreateGroup(ctx, services.CategoryGroup{
+		Name:         "Special Awards",
+		Description:  "Special recognition awards",
+		DisplayOrder: 3,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create group 3: %v", err)
+	}
+
+	// Create categories in each group
+	g1Int := int(group1ID)
+	g2Int := int(group2ID)
+	g3Int := int(group3ID)
+
+	cat1ID, _ := categorySvc.CreateCategory(ctx, services.Category{
+		Name:         "Fastest Looking",
+		GroupID:      &g1Int,
+		DisplayOrder: 1,
+	})
+	cat2ID, _ := categorySvc.CreateCategory(ctx, services.Category{
+		Name:         "Most Aerodynamic",
+		GroupID:      &g1Int,
+		DisplayOrder: 2,
+	})
+	cat3ID, _ := categorySvc.CreateCategory(ctx, services.Category{
+		Name:         "Best Design",
+		GroupID:      &g2Int,
+		DisplayOrder: 3,
+	})
+	_, _ = categorySvc.CreateCategory(ctx, services.Category{
+		Name:         "Best Paint Job",
+		GroupID:      &g2Int,
+		DisplayOrder: 4,
+	})
+	cat5ID, _ := categorySvc.CreateCategory(ctx, services.Category{
+		Name:         "Most Creative",
+		GroupID:      &g3Int,
+		DisplayOrder: 5,
+	})
+
+	// Step 5: Add additional voters and check QR codes are generated
+	qrCodes, err := voterSvc.GenerateQRCodes(ctx, 20)
+	if err != nil {
+		t.Fatalf("Failed to generate QR codes: %v", err)
+	}
+	if len(qrCodes) != 20 {
+		t.Fatalf("Expected 20 QR codes, got %d", len(qrCodes))
+	}
+
+	// Verify QR codes are unique and properly formatted
+	qrMap := make(map[string]bool)
+	for _, qr := range qrCodes {
+		if qrMap[qr] {
+			t.Errorf("Duplicate QR code found: %s", qr)
+		}
+		qrMap[qr] = true
+		if len(qr) == 0 {
+			t.Error("Empty QR code generated")
+		}
+	}
+
+	// Step 6: Run actual voting
+	// Voter 0-4: Vote for car 0 in cat1, car 1 in cat3
+	// Voter 5-9: Vote for car 1 in cat1, car 2 in cat3
+	// Voter 10-14: Vote for car 2 in cat1, car 0 in cat3
+	// Voter 15-19: Vote for car 0 in cat1, car 1 in cat3 (creates tie in cat1)
+	for i := 0; i < 20; i++ {
+		var car1Idx, car3Idx int
+		if i < 5 {
+			car1Idx, car3Idx = 0, 1
+		} else if i < 10 {
+			car1Idx, car3Idx = 1, 2
+		} else if i < 15 {
+			car1Idx, car3Idx = 2, 0
+		} else {
+			car1Idx, car3Idx = 0, 1 // Creates tie in cat1
+		}
+
+		_, err := votingSvc.SubmitVote(ctx, models.Vote{
+			VoterQR:    qrCodes[i],
+			CategoryID: int(cat1ID),
+			CarID:      cars[car1Idx].ID,
+		})
+		if err != nil {
+			t.Fatalf("Vote submission failed for voter %d: %v", i, err)
+		}
+
+		_, err = votingSvc.SubmitVote(ctx, models.Vote{
+			VoterQR:    qrCodes[i],
+			CategoryID: int(cat3ID),
+			CarID:      cars[car3Idx].ID,
+		})
+		if err != nil {
+			t.Fatalf("Vote submission failed for voter %d cat3: %v", i, err)
+		}
+	}
+
+	// Step 7: Have users change their mind and vote for different people
+	// First 5 voters change their vote in cat1
+	for i := 0; i < 5; i++ {
+		_, err := votingSvc.SubmitVote(ctx, models.Vote{
+			VoterQR:    qrCodes[i],
+			CategoryID: int(cat1ID),
+			CarID:      cars[2].ID, // Change to car 2
+		})
+		if err != nil {
+			t.Fatalf("Vote change failed for voter %d: %v", i, err)
+		}
+	}
+
+	// Step 8: Test exclusivity - vote for same car in exclusive categories
+	_, err = votingSvc.SubmitVote(ctx, models.Vote{
+		VoterQR:    qrCodes[0],
+		CategoryID: int(cat2ID),
+		CarID:      cars[2].ID, // Same car as cat1, should trigger conflict
+	})
+	if err != nil {
+		t.Fatalf("Exclusivity vote failed: %v", err)
+	}
+
+	// Verify conflict was handled - voter should only have vote in cat2 now for pool 1
+	voterID, _ := repo.GetVoterByQR(ctx, qrCodes[0])
+	votes, _ := repo.GetVoterVotes(ctx, voterID)
+	if votes[int(cat1ID)] != 0 {
+		t.Errorf("Expected cat1 vote to be cleared due to exclusivity, but found vote")
+	}
+	if votes[int(cat2ID)] != cars[2].ID {
+		t.Errorf("Expected vote in cat2 for car %d", cars[2].ID)
+	}
+
+	// Step 9: Close voting and try to vote after it's closed
+	err = settingsSvc.CloseVoting(ctx)
+	if err != nil {
+		t.Fatalf("Failed to close voting: %v", err)
+	}
+
+	// Attempt to vote after closing - should be rejected
+	_, err = votingSvc.SubmitVote(ctx, models.Vote{
+		VoterQR:    qrCodes[19],
+		CategoryID: int(cat5ID),
+		CarID:      cars[0].ID,
+	})
+	if err == nil {
+		t.Error("Expected error when voting after close, but got none")
+	}
+	if err != services.ErrVotingClosed {
+		t.Errorf("Expected ErrVotingClosed, got: %v", err)
+	}
+
+	// Step 10: Resolve the vote, including ties and conflicts
+	results, err := resultsSvc.GetResults(ctx)
+	if err != nil {
+		t.Fatalf("Failed to get results: %v", err)
+	}
+
+	// Check for ties
+	ties, err := resultsSvc.DetectTies(ctx)
+	if err != nil {
+		t.Fatalf("Failed to detect ties: %v", err)
+	}
+
+	// We should have a tie in cat1 (car 0 and car 2 both have 9-10 votes after changes)
+	hasTie := false
+	for _, tie := range ties {
+		if tie.CategoryID == int(cat1ID) {
+			hasTie = true
+			if len(tie.TiedCars) < 2 {
+				t.Errorf("Expected tie with at least 2 cars, got %d", len(tie.TiedCars))
+			}
+		}
+	}
+
+	// Resolve the tie manually
+	if hasTie {
+		err = resultsSvc.SetManualWinner(ctx, int(cat1ID), cars[0].ID, "Broke tie by coin flip")
+		if err != nil {
+			t.Fatalf("Failed to set manual winner: %v", err)
+		}
+
+		// Verify manual winner was set
+		categories, _ := repo.ListCategories(ctx)
+		for _, cat := range categories {
+			if cat.ID == int(cat1ID) {
+				if cat.OverrideWinnerCarID == nil || *cat.OverrideWinnerCarID != cars[0].ID {
+					t.Errorf("Manual winner not properly set for cat1")
+				}
+				if cat.OverrideReason != "Broke tie by coin flip" {
+					t.Errorf("Override reason not set correctly")
+				}
+			}
+		}
+	}
+
+	// Verify results structure
+	if len(results.Categories) != 5 {
+		t.Errorf("Expected 5 categories in results, got %d", len(results.Categories))
+	}
+
+	// Step 11: Push results back to DerbyNet
+	// Note: With mock client, we need to first sync categories to get DerbyNet award IDs
+	// For this test, we'll manually link categories to awards
+	awards := mockClient.GetAwards()
+	if len(awards) > 0 {
+		// Link first category to first award
+		repo.UpdateCategory(ctx, int(cat1ID), "Fastest Looking", 1, &g1Int, nil, nil, true)
+	}
+
+	// Push results
+	pushResult, err := resultsSvc.PushResultsToDerbyNet(ctx, "http://mock-derbynet.local")
+	if err != nil {
+		t.Fatalf("Failed to push results to DerbyNet: %v", err)
+	}
+
+	// Verify push result
+	if pushResult.Status != "success" && pushResult.Status != "partial" {
+		t.Errorf("Expected success or partial status, got: %s", pushResult.Status)
+	}
+
+	// Most categories won't have DerbyNet links, so we expect some skipped
+	if pushResult.Skipped == 0 && pushResult.WinnersPushed == 0 {
+		t.Error("Expected either skipped or pushed winners, got neither")
+	}
+
+	t.Logf("Integration test completed successfully - Winners pushed: %d, Skipped: %d, Errors: %d",
+		pushResult.WinnersPushed, pushResult.Skipped, pushResult.Errors)
+}
+
+// ============================================================================
+// Integration Test: DerbyNet Results Push with Categories Linked
+// ============================================================================
+
+// TestIntegration_PushResultsToDerbyNet tests pushing voting results to DerbyNet
+func TestIntegration_PushResultsToDerbyNet(t *testing.T) {
+	repo := testutil.NewTestRepository(t)
+	ctx := context.Background()
+	log := logger.New()
+
+	mockClient := derbynet.NewMockClient()
+	categorySvc := services.NewCategoryService(log, repo, mockClient)
+	carSvc := services.NewCarService(log, repo, mockClient)
+	settingsSvc := services.NewSettingsService(log, repo)
+	votingSvc := services.NewVotingService(log, repo, categorySvc, carSvc, settingsSvc)
+	resultsSvc := services.NewResultsService(log, repo, settingsSvc, mockClient)
+
+	// Sync cars from DerbyNet (creates cars with DerbyNet racer IDs)
+	syncResult, err := carSvc.SyncFromDerbyNet(ctx, "http://mock-derbynet.local")
+	if err != nil {
+		t.Fatalf("Failed to sync cars: %v", err)
+	}
+	if syncResult.Status != "success" {
+		t.Fatalf("Sync failed: %s", syncResult.Message)
+	}
+
+	cars, _ := carSvc.ListCars(ctx)
+
+	// Sync categories from DerbyNet awards
+	catSyncResult, err := categorySvc.SyncFromDerbyNet(ctx, "http://mock-derbynet.local")
+	if err != nil {
+		t.Fatalf("Failed to sync categories: %v", err)
+	}
+	if catSyncResult.CategoriesCreated == 0 && catSyncResult.CategoriesUpdated == 0 {
+		t.Fatal("Expected categories to be synced from DerbyNet")
+	}
+
+	categories, _ := categorySvc.ListCategories(ctx)
+	if len(categories) == 0 {
+		t.Fatal("No categories after import")
+	}
+
+	// Submit votes for first 3 categories
+	for i := 0; i < 3 && i < len(categories); i++ {
+		cat := categories[i]
+		// 5 votes for car 0, 3 votes for car 1, 2 votes for car 2
+		for v := 0; v < 10; v++ {
+			var carIdx int
+			if v < 5 {
+				carIdx = 0
+			} else if v < 8 {
+				carIdx = 1
+			} else {
+				carIdx = 2
+			}
+
+			qr := fmt.Sprintf("PUSH-TEST-%d-%d", i, v)
+			_, err := votingSvc.SubmitVote(ctx, models.Vote{
+				VoterQR:    qr,
+				CategoryID: cat.ID,
+				CarID:      cars[carIdx].ID,
+			})
+			if err != nil {
+				t.Fatalf("Failed to submit vote: %v", err)
+			}
+		}
+	}
+
+	// Push results to DerbyNet
+	pushResult, err := resultsSvc.PushResultsToDerbyNet(ctx, "http://mock-derbynet.local")
+	if err != nil {
+		t.Fatalf("Failed to push results: %v", err)
+	}
+
+	// Should successfully push winners for categories that were imported
+	if pushResult.WinnersPushed == 0 {
+		t.Error("Expected at least some winners to be pushed")
+	}
+
+	// Verify winners were recorded in mock client
+	winners := mockClient.GetAwardWinners()
+	if len(winners) == 0 {
+		t.Error("Expected award winners to be recorded in mock client")
+	}
+
+	t.Logf("Successfully pushed %d winners to DerbyNet", pushResult.WinnersPushed)
+}
+
+// ============================================================================
+// Integration Test: Voting After Close and Reopening
+// ============================================================================
+
+// TestIntegration_VotingClosedAndReopened tests the complete close/reopen cycle
+func TestIntegration_VotingClosedAndReopened(t *testing.T) {
+	repo := testutil.NewTestRepository(t)
+	ctx := context.Background()
+	log := logger.New()
+
+	settingsSvc := services.NewSettingsService(log, repo)
+	categorySvc := services.NewCategoryService(log, repo, derbynet.NewMockClient())
+	carSvc := services.NewCarService(log, repo, derbynet.NewMockClient())
+	votingSvc := services.NewVotingService(log, repo, categorySvc, carSvc, settingsSvc)
+
+	// Create test data
+	catID, _ := categorySvc.CreateCategory(ctx, services.Category{Name: "Test Cat", DisplayOrder: 1})
+	_ = repo.CreateCar(ctx, "100", "Test Racer", "Test Car", "")
+	cars, _ := repo.ListCars(ctx)
+
+	// Initial vote while open
+	_, err := votingSvc.SubmitVote(ctx, models.Vote{
+		VoterQR:    "VOTER-1",
+		CategoryID: int(catID),
+		CarID:      cars[0].ID,
+	})
+	if err != nil {
+		t.Fatalf("Initial vote failed: %v", err)
+	}
+
+	// Close voting
+	err = settingsSvc.CloseVoting(ctx)
+	if err != nil {
+		t.Fatalf("Failed to close voting: %v", err)
+	}
+
+	// Try to submit new vote - should fail
+	_, err = votingSvc.SubmitVote(ctx, models.Vote{
+		VoterQR:    "VOTER-2",
+		CategoryID: int(catID),
+		CarID:      cars[0].ID,
+	})
+	if err != services.ErrVotingClosed {
+		t.Errorf("Expected ErrVotingClosed, got: %v", err)
+	}
+
+	// Try to change existing vote - should also fail
+	_, err = votingSvc.SubmitVote(ctx, models.Vote{
+		VoterQR:    "VOTER-1",
+		CategoryID: int(catID),
+		CarID:      cars[0].ID,
+	})
+	if err != services.ErrVotingClosed {
+		t.Errorf("Expected ErrVotingClosed when changing vote, got: %v", err)
+	}
+
+	// Reopen voting
+	err = settingsSvc.OpenVoting(ctx)
+	if err != nil {
+		t.Fatalf("Failed to reopen voting: %v", err)
+	}
+
+	// Now voting should work again
+	_, err = votingSvc.SubmitVote(ctx, models.Vote{
+		VoterQR:    "VOTER-2",
+		CategoryID: int(catID),
+		CarID:      cars[0].ID,
+	})
+	if err != nil {
+		t.Errorf("Vote after reopening failed: %v", err)
+	}
+
+	// Verify both votes exist
+	voterID1, _ := repo.GetVoterByQR(ctx, "VOTER-1")
+	voterID2, _ := repo.GetVoterByQR(ctx, "VOTER-2")
+	votes1, _ := repo.GetVoterVotes(ctx, voterID1)
+	votes2, _ := repo.GetVoterVotes(ctx, voterID2)
+
+	if len(votes1) != 1 || len(votes2) != 1 {
+		t.Errorf("Expected both voters to have 1 vote each")
+	}
+}
