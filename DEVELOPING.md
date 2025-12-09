@@ -193,6 +193,29 @@ CMake targets for cross-compilation:
 - `build-darwin-arm64` - macOS Apple Silicon
 - `build-all` (requires all cross-compilers)
 
+### GitHub Actions CI/CD
+
+The project includes automated builds for all platforms via GitHub Actions. On every push to `main`, the workflow:
+
+1. Runs the full test suite
+2. Builds binaries for all 7 platforms (Linux amd64/arm64/armv7/armv6, Windows amd64, macOS amd64/arm64)
+3. Compresses Linux and Windows binaries with UPX
+4. Waits for manual approval to create a release
+
+**Setting up manual release approval:**
+
+1. Go to your GitHub repository Settings → Environments
+2. Create a new environment named `release`
+3. Enable "Required reviewers" and add yourself
+4. Save the environment
+
+After builds complete, the release job will wait for your approval. Once approved, it will:
+- Create a Git tag with version `YYYY.MM.DD-{commit}`
+- Create a GitHub release with all binaries attached
+- Generate release notes from recent commits
+
+To trigger a release manually, go to Actions → Build → Run workflow.
+
 ---
 
 ## Testing
