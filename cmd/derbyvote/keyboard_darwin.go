@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"syscall"
-	"unsafe"
 
 	"github.com/abrezinsky/derbyvote/internal/browser"
 	"github.com/abrezinsky/derbyvote/internal/logger"
